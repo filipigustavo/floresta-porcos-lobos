@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Cenário 2.5D - Floresta</title>
+    <title>Floresta de Porcos e Lobos</title>
     <style>
         body, html {
             margin: 0;
@@ -95,18 +95,20 @@
             🪙 <strong>Moedas:</strong> Coletadas ao derrotar lobos.<br>
             🛡️ <strong>Escudos (🟡🟢🔵):</strong> Protegem contra 1, 2 ou 3 ataques dos lobos.<br>
             🧲 <strong>Aura (Orbe Dourado):</strong> Aumenta muito a sua área de coleta por 30s.<br>
-            🗡️ <strong>Espada:</strong> Transforma o próximo lobo atingido em moedas (dura 30s).
+            🗡️ <strong>Espada:</strong> Transforma o próximo lobo atingido em moedas (dura 30s).<br>
+            🦔 <strong>Espinhos:</strong> Dispara espinhos circulares por 10s (não acumula com Aura).
         </div>
     </div>
 
     <!-- UI de Pontuação (Oculta no Menu) -->
     <div id="score-layer" style="display: none; position: absolute; top: 20px; right: 20px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-size: 28px; font-weight: bold; pointer-events: none;">
-        ⏱️ <span id="globalTimerVal">10:00</span>
+        ⏱️ <span id="globalTimerVal">04:00</span>
         <span style="margin-left: 15px;">🪙 <span id="coinVal">0</span></span>
         <span style="margin-left: 15px;">🥓 Pontos: <span id="scoreVal">0</span></span>
         <span id="shieldUI" style="margin-left: 15px;"></span>
         <span id="swordUI" style="margin-left: 15px; display: none;">🗡️ <span id="swordTimerVal">30</span>s</span>
         <span id="auraUI" style="margin-left: 15px; color: #FFD700; display: none;">🧲 <span id="auraTimerVal">30</span>s</span>
+        <span id="spikeUI" style="margin-left: 15px; color: #D3D3D3; display: none;">🦔 <span id="spikeTimerVal">30</span>s</span>
     </div>
 
     <!-- UI de Fim de Jogo -->
@@ -174,6 +176,11 @@
         const numAuras = Math.max(1, Math.floor(numPigs / 40)); // 1 aura a cada 40 porcos
         const auras = [];
 
+        // Área dos Espinhos Colecionáveis
+        const numSpikeItems = Math.max(1, Math.floor(numPigs / 30)); // 1 espinho a cada 30 porcos
+        const spikeItems = [];
+        const projectiles = []; // Espinhos disparados
+
         // --- Novas Variáveis da Espada e Moedas ---
         const numSwords = Math.max(1, Math.floor(numPigs / 50)); // 1 espada a cada 50 porcos
         const swords = [];
@@ -182,14 +189,18 @@
         // Sistema de Pontuação e UI
         let score = 0;
         let coinsScore = 0; // Contagem de moedas
-        let globalTimer = 600; // 10 minutos em segundos (10 * 60)
+        let globalTimer = 240; // 4 minutos em segundos (4 * 60)
         
+        const floatingMessages = []; // Array para as mensagens pop-up na tela
+
         const scoreElement = document.getElementById('scoreVal');
         const coinElement = document.getElementById('coinVal');
         const shieldElement = document.getElementById('shieldUI');
         const auraUIElement = document.getElementById('auraUI');
+        const spikeUIElement = document.getElementById('spikeUI');
         const swordUIElement = document.getElementById('swordUI');
         const auraTimerElement = document.getElementById('auraTimerVal');
+        const spikeTimerElement = document.getElementById('spikeTimerVal');
         const swordTimerElement = document.getElementById('swordTimerVal');
         const globalTimerElement = document.getElementById('globalTimerVal');
         
@@ -213,10 +224,12 @@
         const player = {
             x: 0,
             z: 800, // Começa um pouco à frente
-            speed: 18,
+            speed: 9, // Velocidade reduzida pela metade (era 18)
             radius: 15, // Raio base para colisão
             auraRadius: 0, // Raio extra da aura de coleta
             auraTimer: 0, // Temporizador do power-up em segundos
+            spikeTimer: 0, // Temporizador do espinho em segundos
+            spikeShootTimer: 0, // Temporizador do disparo de espinhos
             swordTimer: 0, // Temporizador da espada em segundos
             facing: 'up', // 'up', 'down', 'left', 'right'
             isMoving: false,
@@ -230,6 +243,22 @@
         function toggleInfo() {
             const panel = document.getElementById('info-panel');
             panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+        }
+
+        // --- Função de Mensagens Flutuantes ---
+        function addMessage(text, color) {
+            // Desvio aleatório para evitar que múltiplas mensagens simultâneas (ex: várias moedas) se sobreponham
+            const offsetX = (Math.random() - 0.5) * 80;
+            const offsetY = (Math.random() - 0.5) * 40;
+            
+            floatingMessages.push({
+                text: text,
+                color: color,
+                life: 0.75, // Duração de 0,75 segundos
+                maxLife: 0.75,
+                startY: (height / 2) + offsetY,
+                x: (width / 2) + offsetX
+            });
         }
 
         // --- Funções Auxiliares do Escudo ---
@@ -264,9 +293,10 @@
             
             player.facing = 'up'; // Vira de costas novamente para explorar
             lastTime = Date.now();
-            globalTimer = 600;
+            globalTimer = 240;
             score = 0;
             coinsScore = 0;
+            floatingMessages.length = 0; // Limpa as mensagens antigas
             
             // Remove teclas que podem ter ficado "presas" ao interagir com a UI
             keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = false;
@@ -278,7 +308,7 @@
             if (reason === 'time') {
                 gameOverTitle.innerText = "VITÓRIA!";
                 gameOverTitle.style.color = "#32CD32"; // Verde amigável
-                gameOverMsg.innerText = "Parabéns! Você sobreviveu aos 10 minutos na floresta.";
+                gameOverMsg.innerText = "Parabéns! Você sobreviveu aos 4 minutos na floresta.";
                 
                 // Exibe as estatísticas
                 finalScoreVal.innerText = score;
@@ -299,22 +329,26 @@
         function restartGame() {
             score = 0;
             coinsScore = 0; 
-            globalTimer = 600; 
+            globalTimer = 240; 
             
             scoreElement.innerText = score;
             coinElement.innerText = coinsScore;
-            globalTimerElement.innerText = "10:00";
+            globalTimerElement.innerText = "04:00";
             
             player.x = 0;
             player.z = 800;
             player.shieldHits = 0; 
             player.auraRadius = 0; 
             player.auraTimer = 0; 
+            player.spikeTimer = 0;
+            player.spikeShootTimer = 0;
             player.hasSword = false; 
             player.swordTimer = 0; 
+            floatingMessages.length = 0; // Limpa as mensagens ao recomeçar
             
             updateShieldUI();
             auraUIElement.style.display = 'none';
+            spikeUIElement.style.display = 'none';
             swordUIElement.style.display = 'none';
             gameOverLayer.style.display = 'none';
             
@@ -371,6 +405,8 @@
             wolves.length = 0;
             shields.length = 0;
             auras.length = 0;
+            spikeItems.length = 0;
+            projectiles.length = 0;
             swords.length = 0;
             coinsMap.length = 0;
             
@@ -435,6 +471,15 @@
             // Gerar Auras Colecionáveis
             for (let i = 0; i < numAuras; i++) {
                 auras.push({
+                    x: (Math.random() - 0.5) * spreadX,
+                    z: Math.random() * spreadZ,
+                    animOffset: Math.random() * Math.PI * 2
+                });
+            }
+
+            // Gerar Espinhos Colecionáveis
+            for (let i = 0; i < numSpikeItems; i++) {
+                spikeItems.push({
                     x: (Math.random() - 0.5) * spreadX,
                     z: Math.random() * spreadZ,
                     animOffset: Math.random() * Math.PI * 2
@@ -707,6 +752,57 @@
             ctx.fill();
         }
 
+        // --- Função de Desenho do Item Espinho ---
+        function drawSpikeCollectible(sx, sy, scale, item) {
+            const w = 10 * scale;
+            const time = Date.now() / 150;
+            const floatY = Math.sin(time + item.animOffset) * 10 * scale;
+            const drawY = sy - 20*scale + floatY; 
+
+            // Sombra
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w*1.5, w/1.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Corpo base
+            ctx.fillStyle = '#8B4513';
+            ctx.beginPath();
+            ctx.arc(sx, drawY, w, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Espinhos giratórios
+            ctx.fillStyle = '#D3D3D3';
+            for (let i = 0; i < 8; i++) {
+                let angle = (i/8) * Math.PI * 2 + time * 1.5;
+                ctx.beginPath();
+                ctx.moveTo(sx + Math.cos(angle - 0.2)*w*0.8, drawY + Math.sin(angle - 0.2)*w*0.8);
+                ctx.lineTo(sx + Math.cos(angle)*w*2, drawY + Math.sin(angle)*w*2);
+                ctx.lineTo(sx + Math.cos(angle + 0.2)*w*0.8, drawY + Math.sin(angle + 0.2)*w*0.8);
+                ctx.fill();
+            }
+        }
+
+        // --- Função de Desenho do Espinho Disparado ---
+        function drawProjectile(sx, sy, scale, proj) {
+            const w = 4 * scale;
+            const len = 25 * scale;
+            
+            ctx.save();
+            ctx.translate(sx, sy - 15*scale);
+            ctx.rotate(proj.angle); 
+            
+            ctx.fillStyle = '#D3D3D3';
+            ctx.beginPath();
+            ctx.moveTo(len/2, 0); // Ponta
+            ctx.lineTo(-len/2, w); // Traseira Direita
+            ctx.lineTo(-len/4, 0); // Traseira Centro
+            ctx.lineTo(-len/2, -w); // Traseira Esquerda
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
         // --- Função de Desenho do Item Espada ---
         function drawSwordItem(sx, sy, scale, sword) {
             const w = 8 * scale;
@@ -899,6 +995,40 @@
                     }
                 }
 
+                // 2.5 Atualiza Espinhos
+                if (player.spikeTimer > 0) {
+                    player.spikeTimer -= dt;
+                    player.spikeShootTimer -= dt;
+
+                    // Dispara ondas circulares de espinhos a cada 0.2s (disparo muito mais contínuo)
+                    if (player.spikeShootTimer <= 0) {
+                        player.spikeShootTimer = 0.2;
+                        const numSpikes = 16; // O dobro de espinhos (antes eram 8)
+                        for (let i = 0; i < numSpikes; i++) {
+                            const angle = (i / numSpikes) * Math.PI * 2;
+                            const maxDist = 150 + Math.random() * 150; // Alcance entre 5 a 10 metros
+                            projectiles.push({
+                                x: player.x,
+                                z: player.z,
+                                startX: player.x,
+                                startZ: player.z,
+                                vx: Math.cos(angle) * 450, 
+                                vz: Math.sin(angle) * 450,
+                                maxDist: maxDist,
+                                angle: angle
+                            });
+                        }
+                    }
+
+                    if (player.spikeTimer <= 0) {
+                        player.spikeTimer = 0;
+                        spikeUIElement.style.display = 'none';
+                    } else {
+                        spikeUIElement.style.display = 'inline';
+                        spikeTimerElement.innerText = Math.ceil(player.spikeTimer);
+                    }
+                }
+
                 // 3. Atualiza Espada
                 if (player.swordTimer > 0) {
                     player.swordTimer -= dt;
@@ -952,6 +1082,8 @@
                         if (distSq < (20 + player.radius + player.auraRadius)**2) {
                             score++;
                             scoreElement.innerText = score;
+                            addMessage("+1 Bacon!", "#ffdfdf"); // Mensagem de coleta
+                            
                             p.isBacon = false;
                             p.x = camera.x + (Math.random() - 0.5) * spreadX;
                             p.z = camera.z + spreadZ - 200;
@@ -976,6 +1108,8 @@
                             swordUIElement.style.display = 'none';
 
                             const numCoins = Math.floor(Math.random() * 5) + 1;
+                            addMessage(`Lobo virou ${numCoins} moedas!`, "#FFD700"); // Mensagem da espada
+
                             for(let i = 0; i < numCoins; i++) {
                                 coinsMap.push({ x: w.x + (Math.random() - 0.5) * 80, z: w.z + (Math.random() - 0.5) * 80, animOffset: Math.random() * Math.PI * 2 });
                             }
@@ -984,10 +1118,14 @@
                         else if (player.shieldHits > 0) {
                             player.shieldHits--;
                             updateShieldUI();
+                            addMessage("Escudo descontado!", "#32CD32"); // Mensagem do escudo
                             w.x = camera.x + (Math.random() - 0.5) * spreadX; w.z = camera.z + spreadZ - 200;
                         } else {
                             const loss = Math.max(5, Math.floor(score / 2));
                             score -= loss;
+                            // Nota: A regra atual do jogo desconta pontos/bacons, não as moedas!
+                            addMessage(`-${loss} pontos descontados!`, "#ff4444"); 
+                            
                             if (score < 0) {
                                 triggerGameOver('wolf');
                             } else {
@@ -1008,6 +1146,8 @@
                     const distSq = (s.x - player.x)**2 + (s.z - player.z)**2;
                     if (distSq < (20 + player.radius)**2) {
                         player.shieldHits = s.hits; player.shieldUIChar = s.ui; updateShieldUI();
+                        addMessage("Escudo Coletado!", s.color); // Mensagem
+                        
                         const newType = getRandomShield(); s.hits = newType.hits; s.color = newType.color; s.ui = newType.ui;
                         s.x = camera.x + (Math.random() - 0.5) * spreadX; s.z = camera.z + spreadZ - 200;
                     }
@@ -1019,16 +1159,46 @@
                     const distSq = (a.x - player.x)**2 + (a.z - player.z)**2;
                     if (distSq < (20 + player.radius)**2) {
                         player.auraRadius = 90; player.auraTimer = 30;
+                        addMessage("Aura Coletada!", "#FFD700"); // Mensagem
+
+                        // Exclusividade com Espinhos
+                        if (player.spikeTimer > 0) {
+                            player.spikeTimer = 0;
+                            spikeUIElement.style.display = 'none';
+                        }
+                        
                         a.x = camera.x + (Math.random() - 0.5) * spreadX; a.z = camera.z + spreadZ - 200;
                     }
                     while (a.z < camera.z - 150) a.z += spreadZ; while (a.z > camera.z + spreadZ - 150) a.z -= spreadZ;
                     while (a.x < camera.x - spreadX/2) a.x += spreadX; while (a.x > camera.x + spreadX/2) a.x -= spreadX;
                 }
 
+                for (let spk of spikeItems) {
+                    const distSq = (spk.x - player.x)**2 + (spk.z - player.z)**2;
+                    if (distSq < (20 + player.radius)**2) {
+                        player.spikeTimer = 30; // Tempo aumentado para 30 segundos
+                        player.spikeShootTimer = 0; // Dispara primeira onda imediatamente
+                        addMessage("Espinhos Coletados!", "#D3D3D3"); 
+
+                        // Exclusividade com Aura
+                        if (player.auraTimer > 0) {
+                            player.auraTimer = 0;
+                            player.auraRadius = 0;
+                            auraUIElement.style.display = 'none';
+                        }
+                        
+                        spk.x = camera.x + (Math.random() - 0.5) * spreadX; spk.z = camera.z + spreadZ - 200;
+                    }
+                    while (spk.z < camera.z - 150) spk.z += spreadZ; while (spk.z > camera.z + spreadZ - 150) spk.z -= spreadZ;
+                    while (spk.x < camera.x - spreadX/2) spk.x += spreadX; while (spk.x > camera.x + spreadX/2) spk.x -= spreadX;
+                }
+
                 for (let sw of swords) {
                     const distSq = (sw.x - player.x)**2 + (sw.z - player.z)**2;
                     if (distSq < (20 + player.radius)**2) {
                         player.hasSword = true; player.swordTimer = 30; swordUIElement.style.display = 'inline';
+                        addMessage("Espada Coletada!", "#C0C0C0"); // Mensagem
+                        
                         sw.x = camera.x + (Math.random() - 0.5) * spreadX; sw.z = camera.z + spreadZ - 200;
                     }
                     while (sw.z < camera.z - 150) sw.z += spreadZ; while (sw.z > camera.z + spreadZ - 150) sw.z -= spreadZ;
@@ -1038,9 +1208,54 @@
                 for (let i = coinsMap.length - 1; i >= 0; i--) {
                     let c = coinsMap[i];
                     if ((c.x - player.x)**2 + (c.z - player.z)**2 < (20 + player.radius + player.auraRadius)**2) {
-                        coinsScore++; coinElement.innerText = coinsScore; coinsMap.splice(i, 1);
+                        coinsScore++; coinElement.innerText = coinsScore; 
+                        addMessage("+1 Moeda!", "#FFD700"); // Mensagem
+                        
+                        coinsMap.splice(i, 1);
                     } else if (c.z < camera.z - 150 || Math.abs(c.x - camera.x) > spreadX/2) {
                         coinsMap.splice(i, 1);
+                    }
+                }
+
+                // --- Lógica de Espinhos Disparados (Projectiles) ---
+                for (let i = projectiles.length - 1; i >= 0; i--) {
+                    let p = projectiles[i];
+                    p.x += p.vx * dt;
+                    p.z += p.vz * dt;
+                    
+                    let distTraveled = Math.sqrt((p.x - p.startX)**2 + (p.z - p.startZ)**2);
+                    let hit = false;
+
+                    // Colisão com porcos (Transforma em bacon)
+                    for (let pig of pigs) {
+                        if (!pig.isBacon && Math.sqrt((p.x - pig.x)**2 + (p.z - pig.z)**2) < 20) {
+                            pig.isBacon = true;
+                            hit = true;
+                            break; // Destrói o espinho imediatamente
+                        }
+                    }
+
+                    // Colisão com lobos (Somente se o jogador tiver a espada ativa)
+                    if (!hit && player.hasSword) {
+                        for (let w of wolves) {
+                            if (Math.sqrt((p.x - w.x)**2 + (p.z - w.z)**2) < 25) {
+                                hit = true;
+                                const numCoins = Math.floor(Math.random() * 5) + 1;
+                                addMessage(`Lobo abatido! ${numCoins} moedas`, "#FFD700");
+                                
+                                for(let c = 0; c < numCoins; c++) {
+                                    coinsMap.push({ x: w.x + (Math.random() - 0.5) * 80, z: w.z + (Math.random() - 0.5) * 80, animOffset: Math.random() * Math.PI * 2 });
+                                }
+                                w.x = camera.x + (Math.random() - 0.5) * spreadX;
+                                w.z = camera.z + spreadZ - 200;
+                                break;
+                            }
+                        }
+                    }
+
+                    // Remove o espinho se colidiu com algo ou se chegou ao seu limite de alcance
+                    if (hit || distTraveled >= p.maxDist) {
+                        projectiles.splice(i, 1);
                     }
                 }
             } 
@@ -1078,6 +1293,8 @@
             for (let w of wolves) { const dz = w.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'wolf', obj: w, dz: dz }); }
             for (let s of shields) { const dz = s.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'shield', obj: s, dz: dz }); }
             for (let a of auras) { const dz = a.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'aura', obj: a, dz: dz }); }
+            for (let spk of spikeItems) { const dz = spk.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'spikeItem', obj: spk, dz: dz }); }
+            for (let proj of projectiles) { const dz = proj.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'projectile', obj: proj, dz: dz }); }
             for (let sw of swords) { const dz = sw.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'sword', obj: sw, dz: dz }); }
             for (let c of coinsMap) { const dz = c.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'coin', obj: c, dz: dz }); }
             
@@ -1105,12 +1322,42 @@
                     else if (item.type === 'wolf') drawWolf(sx, sy, scale, entity);
                     else if (item.type === 'shield') drawShield(sx, sy, scale, entity);
                     else if (item.type === 'aura') drawAuraItem(sx, sy, scale, entity);
+                    else if (item.type === 'spikeItem') drawSpikeCollectible(sx, sy, scale, entity);
+                    else if (item.type === 'projectile') drawProjectile(sx, sy, scale, entity);
                     else if (item.type === 'sword') drawSwordItem(sx, sy, scale, entity);
                     else if (item.type === 'coin') drawCoinItem(sx, sy, scale, entity);
                     else if (item.type === 'player') drawPlayer(sx, sy, scale, entity);
                 }
             }
             ctx.globalAlpha = 1;
+
+            // --- Renderização das Mensagens Flutuantes ---
+            for (let i = floatingMessages.length - 1; i >= 0; i--) {
+                let msg = floatingMessages[i];
+                msg.life -= dt;
+                
+                if (msg.life <= 0) {
+                    floatingMessages.splice(i, 1);
+                    continue;
+                }
+                
+                // Animação de Ease-Out Cubic para desacelerar conforme sobe
+                let t = 1 - (msg.life / msg.maxLife); 
+                let easeOut = 1 - Math.pow(1 - t, 3);
+                let currentY = msg.startY - (120 * easeOut); // O texto sobe 120 pixels no total
+                
+                ctx.save();
+                ctx.globalAlpha = msg.life / msg.maxLife; // Desvanece gradualmente
+                ctx.fillStyle = msg.color;
+                ctx.font = "bold 28px 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
+                ctx.textAlign = "center";
+                // Borda preta para garantir legibilidade num cenário colorido
+                ctx.strokeStyle = "rgba(0,0,0,0.8)";
+                ctx.lineWidth = 4;
+                ctx.strokeText(msg.text, msg.x, currentY);
+                ctx.fillText(msg.text, msg.x, currentY);
+                ctx.restore();
+            }
 
             requestAnimationFrame(gameLoop);
         }
