@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Cenário 2.5D - Floresta</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden; /* Evita barras de rolagem */
+            background-color: #87CEEB; /* Cor de fundo do céu fallback */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none; /* Previne rolagem no mobile ao tocar na tela */
+        }
+        
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            text-shadow: 1px 1px 3px rgba(0,0,0,0.8);
+            pointer-events: none; /* Permite clicar através da UI */
+        }
+
+        h1 {
+            margin: 0 0 5px 0;
+            font-size: 24px;
+        }
+
+        p {
+            margin: 0;
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .controls-hint {
+            margin-top: 15px;
+            font-size: 14px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 10px;
+            border-radius: 8px;
+            display: inline-block;
+        }
+
+        /* Animação suave para botões */
+        .btn-start {
+            padding: 15px 50px; 
+            font-size: 28px; 
+            background: #FF4500; 
+            color: white; 
+            border: 4px solid #fff; 
+            border-radius: 12px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            text-transform: uppercase; 
+            box-shadow: 0 6px 0 #B22222, 0 10px 10px rgba(0,0,0,0.5); 
+            transition: transform 0.1s, box-shadow 0.1s;
+        }
+        .btn-start:hover {
+            transform: translateY(2px);
+            box-shadow: 0 4px 0 #B22222, 0 8px 8px rgba(0,0,0,0.5); 
+        }
+        .btn-start:active {
+            transform: translateY(6px);
+            box-shadow: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TELA DE APRESENTAÇÃO (MENU INICIAL) -->
+    <div id="start-screen" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, rgba(255,255,255,0) 0%, rgba(0,0,0,0.7) 100%); display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 8%; z-index: 200; pointer-events: auto;">
+        <h1 style="font-size: 72px; color: #fff; text-shadow: 4px 4px 0 #228B22, -2px -2px 0 #006400, 0 10px 15px rgba(0,0,0,0.8); margin-bottom: 10px; text-align: center; letter-spacing: 2px;">Floresta de Porcos e Lobos</h1>
+        <p style="font-size: 24px; color: #FFD700; text-shadow: 2px 2px 4px #000; margin-bottom: 60px; font-weight: bold;">Sobreviva aos lobos, colete moedas e transforme porcos em bacon!</p>
+        <button class="btn-start" onclick="startGame()">Começar</button>
+    </div>
+
+    <!-- UI de Controles (Oculta no Menu) -->
+    <div id="ui-layer" style="display: none;">
+        <button onclick="toggleInfo()" style="pointer-events: auto; padding: 8px 16px; font-size: 16px; background: rgba(0,0,0,0.6); color: white; border: 2px solid white; border-radius: 8px; cursor: pointer; font-weight: bold; box-shadow: 0 2px 4px rgba(0,0,0,0.5); transition: background 0.2s;">ℹ️ Info</button>
+        <div id="info-panel" class="controls-hint" style="display: none; pointer-events: auto; margin-top: 10px; max-width: 320px; line-height: 1.5; text-shadow: 1px 1px 2px #000;">
+            <strong>Controles:</strong><br>
+            ⬆️ ⬇️ ⬅️ ➡️ Setas do teclado (ou deslizar)<br><br>
+            <strong>Itens e Mecânicas:</strong><br>
+            🥓 <strong>Bacon:</strong> Encoste nos porcos para os transformar, passe por cima para pontuar.<br>
+            🪙 <strong>Moedas:</strong> Coletadas ao derrotar lobos.<br>
+            🛡️ <strong>Escudos (🟡🟢🔵):</strong> Protegem contra 1, 2 ou 3 ataques dos lobos.<br>
+            🧲 <strong>Aura (Orbe Dourado):</strong> Aumenta muito a sua área de coleta por 30s.<br>
+            🗡️ <strong>Espada:</strong> Transforma o próximo lobo atingido em moedas (dura 30s).
+        </div>
+    </div>
+
+    <!-- UI de Pontuação (Oculta no Menu) -->
+    <div id="score-layer" style="display: none; position: absolute; top: 20px; right: 20px; color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); font-size: 28px; font-weight: bold; pointer-events: none;">
+        ⏱️ <span id="globalTimerVal">10:00</span>
+        <span style="margin-left: 15px;">🪙 <span id="coinVal">0</span></span>
+        <span style="margin-left: 15px;">🥓 Pontos: <span id="scoreVal">0</span></span>
+        <span id="shieldUI" style="margin-left: 15px;"></span>
+        <span id="swordUI" style="margin-left: 15px; display: none;">🗡️ <span id="swordTimerVal">30</span>s</span>
+        <span id="auraUI" style="margin-left: 15px; color: #FFD700; display: none;">🧲 <span id="auraTimerVal">30</span>s</span>
+    </div>
+
+    <!-- UI de Fim de Jogo -->
+    <div id="game-over-layer" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); color: white; flex-direction: column; align-items: center; justify-content: center; z-index: 100; pointer-events: auto;">
+        <h1 id="gameOverTitle" style="font-size: 48px; margin-bottom: 20px; color: #ff4444; text-shadow: 2px 2px 4px #000;">FIM DE JOGO</h1>
+        <p id="gameOverMsg" style="font-size: 24px; margin-bottom: 10px;">Um lobo atacou-o e os seus pontos ficaram negativos.</p>
+        
+        <div id="finalStats" style="display: none; text-align: center; margin-bottom: 30px;">
+            <p style="font-size: 32px; margin: 10px 0; color: #FFD700; font-weight: bold; text-shadow: 1px 1px 3px #000;">🥓 Bacons: <span id="finalScoreVal">0</span></p>
+            <p style="font-size: 32px; margin: 10px 0; color: #DAA520; font-weight: bold; text-shadow: 1px 1px 3px #000;">🪙 Moedas: <span id="finalCoinsVal">0</span></p>
+        </div>
+
+        <button class="btn-start" onclick="restartGame()">Reiniciar Jogo</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Ajusta o tamanho do canvas para preencher a tela inteira
+        let width, height;
+        function resize() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resize);
+        resize();
+
+        // --- Estados do Jogo ---
+        let gameState = 'START'; // 'START', 'PLAYING', 'GAMEOVER'
+
+        // --- Variáveis do Sistema 2.5D ---
+        // A câmera agora segue o jogador
+        const camera = { 
+            x: 0, 
+            z: 0 
+        };
+        
+        const focalLength = 350; // Determina o "zoom" ou campo visão (FOV)
+        const cameraHeight = 350; // Altura aumentada para levantar a câmera
+        const horizonRatio = 0.35; // Desloca o horizonte para cima para simular inclinação
+        const cameraDistance = 400; // Distância da câmera atrás do jogador
+        
+        // Área do mundo onde as árvores existem (efeito de mundo infinito)
+        const spreadX = 4000;
+        const spreadZ = 4000;
+        const numTrees = 600;
+        const trees = [];
+
+        // Área dos porcos
+        const numPigs = 40;
+        const pigs = [];
+        
+        // Área dos lobos
+        const numWolves = Math.floor(numPigs / 10);
+        const wolves = [];
+
+        // Área dos escudos
+        const numShields = Math.max(1, Math.floor(numPigs / 30)); // Garante pelo menos 1 escudo
+        const shields = [];
+
+        // Área das Auras Colecionáveis
+        const numAuras = Math.max(1, Math.floor(numPigs / 40)); // 1 aura a cada 40 porcos
+        const auras = [];
+
+        // --- Novas Variáveis da Espada e Moedas ---
+        const numSwords = Math.max(1, Math.floor(numPigs / 50)); // 1 espada a cada 50 porcos
+        const swords = [];
+        const coinsMap = []; // Moedas dropadas no chão
+
+        // Sistema de Pontuação e UI
+        let score = 0;
+        let coinsScore = 0; // Contagem de moedas
+        let globalTimer = 600; // 10 minutos em segundos (10 * 60)
+        
+        const scoreElement = document.getElementById('scoreVal');
+        const coinElement = document.getElementById('coinVal');
+        const shieldElement = document.getElementById('shieldUI');
+        const auraUIElement = document.getElementById('auraUI');
+        const swordUIElement = document.getElementById('swordUI');
+        const auraTimerElement = document.getElementById('auraTimerVal');
+        const swordTimerElement = document.getElementById('swordTimerVal');
+        const globalTimerElement = document.getElementById('globalTimerVal');
+        
+        // Elementos da UI de Fim de Jogo
+        const gameOverLayer = document.getElementById('game-over-layer');
+        const gameOverTitle = document.getElementById('gameOverTitle');
+        const gameOverMsg = document.getElementById('gameOverMsg');
+        const finalStats = document.getElementById('finalStats');
+        const finalScoreVal = document.getElementById('finalScoreVal');
+        const finalCoinsVal = document.getElementById('finalCoinsVal');
+
+        // Elementos da UI de Start
+        const startScreenLayer = document.getElementById('start-screen');
+        const uiLayer = document.getElementById('ui-layer');
+        const scoreLayer = document.getElementById('score-layer');
+
+        // Variável de Tempo (para o countdown)
+        let lastTime = Date.now();
+
+        // --- Variáveis do Jogador ---
+        const player = {
+            x: 0,
+            z: 800, // Começa um pouco à frente
+            speed: 18,
+            radius: 15, // Raio base para colisão
+            auraRadius: 0, // Raio extra da aura de coleta
+            auraTimer: 0, // Temporizador do power-up em segundos
+            swordTimer: 0, // Temporizador da espada em segundos
+            facing: 'up', // 'up', 'down', 'left', 'right'
+            isMoving: false,
+            animOffset: 0,
+            shieldHits: 0, // Hits suportados pelo escudo atual
+            shieldUIChar: '', // Ícone do escudo atual
+            hasSword: false // Estado da espada
+        };
+
+        // --- Função Toggle Info ---
+        function toggleInfo() {
+            const panel = document.getElementById('info-panel');
+            panel.style.display = (panel.style.display === 'none') ? 'block' : 'none';
+        }
+
+        // --- Funções Auxiliares do Escudo ---
+        function getRandomShield() {
+            const r = Math.random();
+            if (r < 0.33) return { hits: 1, color: '#FFD700', ui: '🟡' }; // Amarelo
+            if (r < 0.66) return { hits: 2, color: '#32CD32', ui: '🟢' }; // Verde
+            return { hits: 3, color: '#1E90FF', ui: '🔵' }; // Azul
+        }
+
+        function updateShieldUI() {
+            if (player.shieldHits <= 0) {
+                shieldElement.innerHTML = '';
+            } else {
+                let html = '';
+                for(let i=0; i<player.shieldHits; i++) {
+                    html += player.shieldUIChar;
+                }
+                shieldElement.innerHTML = html;
+            }
+        }
+
+        // --- Funções de Estado de Jogo ---
+        function startGame() {
+            gameState = 'PLAYING';
+            startScreenLayer.style.display = 'none';
+            uiLayer.style.display = 'block';
+            scoreLayer.style.display = 'block';
+            
+            // Garante que o painel de info começa escondido
+            document.getElementById('info-panel').style.display = 'none';
+            
+            player.facing = 'up'; // Vira de costas novamente para explorar
+            lastTime = Date.now();
+            globalTimer = 600;
+            score = 0;
+            coinsScore = 0;
+            
+            // Remove teclas que podem ter ficado "presas" ao interagir com a UI
+            keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = false;
+        }
+
+        function triggerGameOver(reason) {
+            gameState = 'GAMEOVER';
+            
+            if (reason === 'time') {
+                gameOverTitle.innerText = "VITÓRIA!";
+                gameOverTitle.style.color = "#32CD32"; // Verde amigável
+                gameOverMsg.innerText = "Parabéns! Você sobreviveu aos 10 minutos na floresta.";
+                
+                // Exibe as estatísticas
+                finalScoreVal.innerText = score;
+                finalCoinsVal.innerText = coinsScore;
+                finalStats.style.display = 'block';
+            } else if (reason === 'wolf') {
+                gameOverTitle.innerText = "DERROTA";
+                gameOverTitle.style.color = "#ff4444"; // Vermelho de perigo
+                gameOverMsg.innerText = "Um lobo atacou-o e os seus pontos ficaram negativos.";
+                
+                // Oculta as estatísticas na derrota
+                finalStats.style.display = 'none';
+            }
+            
+            gameOverLayer.style.display = 'flex';
+        }
+
+        function restartGame() {
+            score = 0;
+            coinsScore = 0; 
+            globalTimer = 600; 
+            
+            scoreElement.innerText = score;
+            coinElement.innerText = coinsScore;
+            globalTimerElement.innerText = "10:00";
+            
+            player.x = 0;
+            player.z = 800;
+            player.shieldHits = 0; 
+            player.auraRadius = 0; 
+            player.auraTimer = 0; 
+            player.hasSword = false; 
+            player.swordTimer = 0; 
+            
+            updateShieldUI();
+            auraUIElement.style.display = 'none';
+            swordUIElement.style.display = 'none';
+            gameOverLayer.style.display = 'none';
+            
+            initEntities(); // Recria as posições dos animais e itens
+            
+            // Remove teclas
+            keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = false;
+            
+            lastTime = Date.now(); 
+            gameState = 'PLAYING';
+            
+            // Reinicia o motor do jogo que havia sido parado no Game Over
+            gameLoop(); 
+        }
+
+        // --- Controles ---
+        const keys = { ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+        window.addEventListener('keydown', e => {
+            if(keys.hasOwnProperty(e.code)) keys[e.code] = true;
+        });
+        window.addEventListener('keyup', e => {
+            if(keys.hasOwnProperty(e.code)) keys[e.code] = false;
+        });
+
+        // Controles de toque para mobile (deslizar)
+        let touchStartX = null;
+        let touchStartY = null;
+        window.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+        window.addEventListener('touchmove', e => {
+            if (gameState !== 'PLAYING') return;
+            if (!touchStartX || !touchStartY) return;
+            const dx = e.touches[0].clientX - touchStartX;
+            const dy = e.touches[0].clientY - touchStartY;
+            
+            keys.ArrowUp = dy < -30;
+            keys.ArrowDown = dy > 30;
+            keys.ArrowLeft = dx < -30;
+            keys.ArrowRight = dx > 30;
+        });
+        window.addEventListener('touchend', () => {
+            touchStartX = null;
+            touchStartY = null;
+            keys.ArrowUp = keys.ArrowDown = keys.ArrowLeft = keys.ArrowRight = false;
+        });
+
+        // Criação das árvores, porcos e lobos
+        function initEntities() {
+            trees.length = 0;
+            pigs.length = 0;
+            wolves.length = 0;
+            shields.length = 0;
+            auras.length = 0;
+            swords.length = 0;
+            coinsMap.length = 0;
+            
+            // Gerar Árvores
+            for (let i = 0; i < numTrees; i++) {
+                trees.push({
+                    x: (Math.random() - 0.5) * spreadX,
+                    z: Math.random() * spreadZ,
+                    scaleModifier: 0.7 + Math.random() * 0.8, // Algumas árvores maiores, outras menores
+                    colorTop: `hsl(${110 + Math.random()*30}, ${40 + Math.random()*30}%, ${35 + Math.random()*15}%)`,
+                    colorMid: `hsl(${110 + Math.random()*30}, ${40 + Math.random()*30}%, ${25 + Math.random()*15}%)`,
+                    colorBot: `hsl(${110 + Math.random()*30}, ${40 + Math.random()*30}%, ${15 + Math.random()*15}%)`
+                });
+            }
+            
+            // Gerar Porcos
+            for (let i = 0; i < numPigs; i++) {
+                // Força os 2 primeiros porcos a estarem perto do jogador para aparecerem no Menu
+                let startX = (i === 0) ? -150 : (i === 1) ? 200 : (Math.random() - 0.5) * spreadX;
+                let startZ = (i === 0) ? player.z + 150 : (i === 1) ? player.z + 200 : Math.random() * spreadZ;
+                
+                pigs.push({
+                    x: startX,
+                    z: startZ,
+                    vx: (Math.random() - 0.5) * 6, // Velocidade X
+                    vz: (Math.random() - 0.5) * 6, // Velocidade Z
+                    color: '#FFB6C1', // Rosa claro
+                    snoutColor: '#FF69B4', // Rosa escuro
+                    animOffset: Math.random() * Math.PI * 2,
+                    isBacon: false
+                });
+            }
+
+            // Gerar Lobos
+            for (let i = 0; i < numWolves; i++) {
+                // Força os 2 primeiros lobos a estarem perto para aparecerem no Menu
+                let startX = (i === 0) ? 150 : (i === 1) ? -220 : (Math.random() - 0.5) * spreadX;
+                let startZ = (i === 0) ? player.z + 180 : (i === 1) ? player.z + 280 : Math.random() * spreadZ;
+
+                wolves.push({
+                    x: startX,
+                    z: startZ,
+                    vx: (Math.random() - 0.5) * 9, 
+                    vz: (Math.random() - 0.5) * 9,
+                    animOffset: Math.random() * Math.PI * 2
+                });
+            }
+
+            // Gerar Escudos
+            for (let i = 0; i < numShields; i++) {
+                const sType = getRandomShield();
+                shields.push({
+                    x: (Math.random() - 0.5) * spreadX,
+                    z: Math.random() * spreadZ,
+                    animOffset: Math.random() * Math.PI * 2,
+                    hits: sType.hits,
+                    color: sType.color,
+                    ui: sType.ui
+                });
+            }
+
+            // Gerar Auras Colecionáveis
+            for (let i = 0; i < numAuras; i++) {
+                auras.push({
+                    x: (Math.random() - 0.5) * spreadX,
+                    z: Math.random() * spreadZ,
+                    animOffset: Math.random() * Math.PI * 2
+                });
+            }
+
+            // Gerar Espadas
+            for (let i = 0; i < numSwords; i++) {
+                swords.push({
+                    x: (Math.random() - 0.5) * spreadX,
+                    z: Math.random() * spreadZ,
+                    animOffset: Math.random() * Math.PI * 2
+                });
+            }
+        }
+        initEntities();
+
+        // --- Função de Desenho de Árvore (Estilo Pinheiro) ---
+        function drawTree(sx, sy, scale, tree) {
+            const mod = tree.scaleModifier;
+            
+            // Escala e tamanho base
+            const trunkW = 20 * scale * mod;
+            const trunkH = 60 * scale * mod;
+            const leafW = 140 * scale * mod;
+            const leafH = 90 * scale * mod;
+
+            // Tronco (Retângulo Marrom)
+            ctx.fillStyle = '#3d2314';
+            ctx.fillRect(sx - trunkW/2, sy - trunkH, trunkW, trunkH);
+
+            // Folhas (Triângulos sobrepostos)
+            // Camada Inferior
+            ctx.fillStyle = tree.colorBot;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - trunkH - leafH * 0.8);
+            ctx.lineTo(sx - leafW/2, sy - trunkH + 10 * scale);
+            ctx.lineTo(sx + leafW/2, sy - trunkH + 10 * scale);
+            ctx.fill();
+
+            // Camada do Meio
+            ctx.fillStyle = tree.colorMid;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - trunkH - leafH * 1.3);
+            ctx.lineTo(sx - leafW/2.2, sy - trunkH - leafH * 0.3);
+            ctx.lineTo(sx + leafW/2.2, sy - trunkH - leafH * 0.3);
+            ctx.fill();
+
+            // Camada Superior
+            ctx.fillStyle = tree.colorTop;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy - trunkH - leafH * 1.8);
+            ctx.lineTo(sx - leafW/2.8, sy - trunkH - leafH * 0.7);
+            ctx.lineTo(sx + leafW/2.8, sy - trunkH - leafH * 0.7);
+            ctx.fill();
+        }
+
+        // --- Função de Desenho do Porco ---
+        function drawPig(sx, sy, scale, pig) {
+            // Desenha bacon ao invés de porco se o estado for verdadeiro
+            if (pig.isBacon) {
+                const bw = 35 * scale;
+                const bh = 15 * scale;
+                
+                // Sombra do bacon
+                ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+                ctx.beginPath();
+                ctx.ellipse(sx, sy, bw/1.5, bh/2, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Carne (Vermelho escuro)
+                ctx.fillStyle = '#b73c3c';
+                ctx.fillRect(sx - bw/2, sy - bh, bw, bh);
+                
+                // Gordura (Listras brancas horizontais)
+                ctx.fillStyle = '#ffdfdf';
+                ctx.fillRect(sx - bw/2, sy - bh + bh*0.2, bw, bh*0.2);
+                ctx.fillRect(sx - bw/2, sy - bh + bh*0.6, bw, bh*0.2);
+                return; // Encerra o desenho da entidade aqui se for bacon
+            }
+
+            const w = 45 * scale;
+            const h = 30 * scale;
+            const legW = 6 * scale;
+            const legH = 12 * scale;
+            
+            // Animação das pernas baseada no tempo
+            const time = Date.now() / 100;
+            // No menu, eles mexem as patas levemente sem sair do lugar
+            const animSpeed = (gameState === 'START') ? 0.3 : 1; 
+            const swing = Math.sin(time * animSpeed + pig.animOffset) * 6 * scale;
+
+            // Sombra oval sob o porco
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w/1.2, h/3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pernas Traseiras (desenhadas antes do corpo, mais escuras)
+            ctx.fillStyle = '#D87093'; 
+            ctx.fillRect(sx - w/3, sy - legH + swing, legW, legH);
+            ctx.fillRect(sx + w/4, sy - legH - swing, legW, legH);
+
+            // Pernas Dianteiras (mesma cor do corpo)
+            ctx.fillStyle = pig.color;
+            ctx.fillRect(sx - w/4, sy - legH - swing, legW, legH);
+            ctx.fillRect(sx + w/3, sy - legH + swing, legW, legH);
+
+            // Corpo oval
+            ctx.fillStyle = pig.color;
+            ctx.beginPath();
+            ctx.ellipse(sx, sy - legH, w/2, h/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Determinar o lado que o porco está olhando (baseado na velocidade X)
+            // No menu, os da esquerda olham direita e vice-versa
+            let facingRight = pig.vx > 0;
+            if (gameState === 'START') facingRight = (pig.x < player.x);
+            
+            const snoutX = facingRight ? sx + w/2 : sx - w/2;
+            const eyeX = facingRight ? sx + w/3 : sx - w/3;
+            
+            // Focinho
+            ctx.fillStyle = pig.snoutColor;
+            ctx.beginPath();
+            ctx.ellipse(snoutX, sy - legH + 2*scale, 8 * scale, 10 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Olho
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(eyeX, sy - legH - 5*scale, 2.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- Função de Desenho do Lobo ---
+        function drawWolf(sx, sy, scale, wolf) {
+            const w = 55 * scale;
+            const h = 35 * scale;
+            const legW = 6 * scale;
+            const legH = 15 * scale;
+            
+            // Animação das pernas baseada no tempo
+            const time = Date.now() / 100;
+            const animSpeed = (gameState === 'START') ? 0.3 : 1;
+            const swing = Math.sin(time * animSpeed + wolf.animOffset) * 8 * scale;
+
+            // Sombra oval sob o lobo
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w/1.2, h/3, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pernas Traseiras (mais escuras)
+            ctx.fillStyle = '#2a2a2a'; 
+            ctx.fillRect(sx - w/3, sy - legH + swing, legW, legH);
+            ctx.fillRect(sx + w/4, sy - legH - swing, legW, legH);
+
+            // Pernas Dianteiras
+            ctx.fillStyle = '#444';
+            ctx.fillRect(sx - w/4, sy - legH - swing, legW, legH);
+            ctx.fillRect(sx + w/3, sy - legH + swing, legW, legH);
+
+            // Cauda (fofa e escura)
+            let facingRight = wolf.vx > 0;
+            if (gameState === 'START') facingRight = (wolf.x < player.x);
+
+            const tailX = facingRight ? sx - w/2 - 10*scale : sx + w/2 + 10*scale;
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.ellipse(tailX, sy - legH - 5*scale, 15*scale, 5*scale, facingRight ? Math.PI/4 : -Math.PI/4, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Corpo oval
+            ctx.fillStyle = '#444';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy - legH, w/2, h/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Focinho e orelhas
+            const snoutX = facingRight ? sx + w/2 + 5*scale : sx - w/2 - 5*scale;
+            const eyeX = facingRight ? sx + w/3 : sx - w/3;
+            const earX = facingRight ? sx + w/4 : sx - w/4;
+            
+            // Orelhas pontudas
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.moveTo(earX, sy - legH - h/2 + 5*scale);
+            ctx.lineTo(earX - 6*scale, sy - legH - h/2 - 12*scale);
+            ctx.lineTo(earX + 6*scale, sy - legH - h/2 + 5*scale);
+            ctx.fill();
+
+            // Focinho alongado
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.ellipse(snoutX, sy - legH, 12 * scale, 6 * scale, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Nariz preto
+            ctx.fillStyle = '#000';
+            ctx.beginPath();
+            ctx.arc(facingRight ? snoutX + 8*scale : snoutX - 8*scale, sy - legH - 2*scale, 2.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Olho vermelho brilhante
+            ctx.fillStyle = '#ff3333';
+            ctx.beginPath();
+            ctx.arc(eyeX, sy - legH - 5*scale, 2.5 * scale, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- Função de Desenho do Escudo ---
+        function drawShield(sx, sy, scale, shield) {
+            const w = 15 * scale;
+            const h = 22 * scale;
+            
+            const time = Date.now() / 150;
+            const floatY = Math.sin(time + shield.animOffset) * 10 * scale;
+            const drawY = sy - 20*scale + floatY; 
+
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w, w/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = shield.color;
+            ctx.beginPath();
+            ctx.moveTo(sx, drawY - h);
+            ctx.lineTo(sx + w, drawY - h/3);
+            ctx.lineTo(sx, drawY + h);
+            ctx.lineTo(sx - w, drawY - h/3);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.beginPath();
+            ctx.moveTo(sx, drawY - h + 3*scale);
+            ctx.lineTo(sx + w - 3*scale, drawY - h/3);
+            ctx.lineTo(sx, drawY + h - 3*scale);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // --- Função de Desenho do Item de Aura ---
+        function drawAuraItem(sx, sy, scale, aura) {
+            const w = 12 * scale;
+            
+            const time = Date.now() / 150;
+            const floatY = Math.sin(time + aura.animOffset) * 10 * scale;
+            const drawY = sy - 20*scale + floatY; 
+
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w*1.5, w/1.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = 'rgba(255, 235, 0, 0.4)';
+            ctx.beginPath();
+            ctx.arc(sx, drawY, w * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.arc(sx, drawY, w, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.arc(sx, drawY, w * 0.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- Função de Desenho do Item Espada ---
+        function drawSwordItem(sx, sy, scale, sword) {
+            const w = 8 * scale;
+            const h = 30 * scale;
+            
+            const time = Date.now() / 150;
+            const floatY = Math.sin(time + sword.animOffset) * 10 * scale;
+            const drawY = sy - 20*scale + floatY; 
+
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w*2.5, w*1.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#C0C0C0';
+            ctx.beginPath();
+            ctx.moveTo(sx, drawY - h);
+            ctx.lineTo(sx + w/2, drawY - h/2);
+            ctx.lineTo(sx + w/2, drawY + h/4);
+            ctx.lineTo(sx - w/2, drawY + h/4);
+            ctx.lineTo(sx - w/2, drawY - h/2);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(sx - w/3, drawY + h/4, w/1.5, h/3);
+            
+            ctx.fillStyle = '#FFD700';
+            ctx.fillRect(sx - w*1.5, drawY + h/4 - 2*scale, w*3, h/6);
+        }
+
+        // --- Função de Desenho da Moeda ---
+        function drawCoinItem(sx, sy, scale, coin) {
+            const w = 12 * scale;
+            
+            const time = Date.now() / 150;
+            const floatY = Math.sin(time + coin.animOffset) * 5 * scale;
+            const drawY = sy - 10*scale + floatY;
+
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.2)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w, w/2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#FFD700';
+            ctx.beginPath();
+            ctx.ellipse(sx, drawY, w, w, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#DAA520';
+            ctx.beginPath();
+            ctx.ellipse(sx, drawY, w*0.7, w*0.7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.beginPath();
+            ctx.ellipse(sx - w/3, drawY - w/3, w*0.2, w*0.2, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // --- Sistema de Colisão ---
+        function checkCollision(targetX, targetZ) {
+            for (let t of trees) {
+                const distSq = (t.x - targetX)**2 + (t.z - targetZ)**2;
+                const minRad = (15 * t.scaleModifier) + player.radius;
+                if (distSq < minRad**2) return true;
+            }
+            for (let p of pigs) {
+                if (p.isBacon) continue;
+                const distSq = (p.x - targetX)**2 + (p.z - targetZ)**2;
+                const interactionRad = 20 + player.radius + player.auraRadius; 
+                if (distSq < interactionRad**2) {
+                    p.isBacon = true; 
+                    if (player.auraRadius === 0) return true; 
+                }
+            }
+            return false;
+        }
+
+        // --- Função de Desenho do Jogador ---
+        function drawPlayer(sx, sy, scale, p) {
+            const w = 30 * scale;
+            const h = 60 * scale;
+            const headR = 12 * scale;
+            
+            p.animOffset += p.isMoving ? 0.2 : 0;
+            if (!p.isMoving) p.animOffset = 0; 
+            const swing = Math.sin(p.animOffset) * 12 * scale;
+
+            if (p.auraRadius > 0) {
+                ctx.fillStyle = 'rgba(255, 235, 0, 0.35)'; 
+                ctx.beginPath();
+                const totalRadius = p.radius + p.auraRadius;
+                const segments = 32; 
+                const cx = width / 2;
+                const horizon = height * horizonRatio;
+                
+                for (let i = 0; i <= segments; i++) {
+                    const angle = (i / segments) * Math.PI * 2;
+                    const edgeX = p.x + Math.cos(angle) * totalRadius;
+                    const edgeZ = p.z + Math.sin(angle) * totalRadius;
+                    
+                    const dz = edgeZ - camera.z;
+                    if (dz > 1) { 
+                        const edgeScale = focalLength / dz;
+                        const edgeSx = cx + (edgeX - camera.x) * edgeScale;
+                        const edgeSy = horizon + cameraHeight * edgeScale;
+                        
+                        if (i === 0) ctx.moveTo(edgeSx, edgeSy);
+                        else ctx.lineTo(edgeSx, edgeSy);
+                    }
+                }
+                ctx.fill();
+            }
+
+            ctx.fillStyle = 'rgba(0, 50, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(sx, sy, w, w/2.5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Pernas (Calça Azul)
+            ctx.fillStyle = '#1E90FF';
+            if (p.facing === 'left' || p.facing === 'right') {
+                ctx.fillRect(sx - 8*scale, sy - 25*scale, 6*scale, 25*scale - swing);
+                ctx.fillRect(sx + 2*scale, sy - 25*scale, 6*scale, 25*scale + swing);
+            } else {
+                ctx.fillRect(sx - 10*scale, sy - 25*scale - (swing > 0 ? swing : 0), 8*scale, 25*scale);
+                ctx.fillRect(sx + 2*scale, sy - 25*scale - (swing < 0 ? -swing : 0), 8*scale, 25*scale);
+            }
+
+            // Corpo (Camisa Vermelha)
+            ctx.fillStyle = '#FF4500';
+            ctx.fillRect(sx - 12*scale, sy - 50*scale, 24*scale, 28*scale);
+
+            // Cabeça (Pele)
+            ctx.fillStyle = '#FFDAB9';
+            ctx.beginPath();
+            ctx.arc(sx, sy - 60*scale, headR, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Detalhes
+            ctx.fillStyle = '#000';
+            if (p.facing === 'down') {
+                ctx.beginPath(); ctx.arc(sx - 4*scale, sy - 62*scale, 2*scale, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(sx + 4*scale, sy - 62*scale, 2*scale, 0, Math.PI * 2); ctx.fill();
+            } else if (p.facing === 'left') {
+                ctx.beginPath(); ctx.arc(sx - 6*scale, sy - 62*scale, 2*scale, 0, Math.PI * 2); ctx.fill();
+            } else if (p.facing === 'right') {
+                ctx.beginPath(); ctx.arc(sx + 6*scale, sy - 62*scale, 2*scale, 0, Math.PI * 2); ctx.fill();
+            } else if (p.facing === 'up') {
+                ctx.fillStyle = '#8B4513';
+                ctx.beginPath();
+                ctx.arc(sx, sy - 62*scale, headR + 1*scale, Math.PI, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        // --- Loop Principal do Jogo ---
+        function gameLoop() {
+            if (gameState === 'GAMEOVER') return; // Interrompe renderização pesada no fim de jogo
+
+            const now = Date.now();
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            // --- LÓGICA DURANTE O JOGO ---
+            if (gameState === 'PLAYING') {
+                // 1. Atualiza temporizador Global
+                if (globalTimer > 0) {
+                    globalTimer -= dt;
+                    if (globalTimer <= 0) {
+                        globalTimer = 0;
+                        triggerGameOver('time');
+                    }
+                }
+                const minutes = Math.floor(globalTimer / 60);
+                const seconds = Math.floor(globalTimer % 60);
+                globalTimerElement.innerText = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                // 2. Atualiza Aura
+                if (player.auraTimer > 0) {
+                    player.auraTimer -= dt;
+                    if (player.auraTimer <= 0) {
+                        player.auraTimer = 0;
+                        player.auraRadius = 0;
+                        auraUIElement.style.display = 'none';
+                    } else {
+                        auraUIElement.style.display = 'inline';
+                        auraTimerElement.innerText = Math.ceil(player.auraTimer);
+                    }
+                }
+
+                // 3. Atualiza Espada
+                if (player.swordTimer > 0) {
+                    player.swordTimer -= dt;
+                    if (player.swordTimer <= 0) {
+                        player.swordTimer = 0;
+                        player.hasSword = false;
+                        swordUIElement.style.display = 'none';
+                    } else {
+                        swordUIElement.style.display = 'inline';
+                        swordTimerElement.innerText = Math.ceil(player.swordTimer);
+                    }
+                }
+
+                // 4. Movimentação do jogador
+                player.isMoving = false;
+                let nextX = player.x;
+                let nextZ = player.z;
+
+                if (keys.ArrowUp) { nextZ += player.speed; player.facing = 'up'; }
+                if (keys.ArrowDown) { nextZ -= player.speed; player.facing = 'down'; }
+                if (keys.ArrowLeft) { nextX -= player.speed; player.facing = 'left'; }
+                if (keys.ArrowRight) { nextX += player.speed; player.facing = 'right'; }
+
+                if (nextX !== player.x && !checkCollision(nextX, player.z)) { player.x = nextX; player.isMoving = true; }
+                if (nextZ !== player.z && !checkCollision(player.x, nextZ)) { player.z = nextZ; player.isMoving = true; }
+
+                // 5. Câmera segue o jogador
+                camera.x = player.x;
+                camera.z = player.z - cameraDistance;
+
+                // 6. Reciclagem e Movimento de Entidades
+                for (let t of trees) {
+                    while (t.z < camera.z - 150) t.z += spreadZ;
+                    while (t.z > camera.z + spreadZ - 150) t.z -= spreadZ;
+                    while (t.x < camera.x - spreadX/2) t.x += spreadX;
+                    while (t.x > camera.x + spreadX/2) t.x -= spreadX;
+                }
+
+                for (let p of pigs) {
+                    if (!p.isBacon) {
+                        let nextPx = p.x + p.vx;
+                        let nextPz = p.z + p.vz;
+                        const distSq = (nextPx - player.x)**2 + (nextPz - player.z)**2;
+                        if (distSq < (20 + player.radius + player.auraRadius)**2) {
+                            p.isBacon = true;
+                        } else {
+                            p.x = nextPx; p.z = nextPz;
+                        }
+                    } else {
+                        const distSq = (p.x - player.x)**2 + (p.z - player.z)**2;
+                        if (distSq < (20 + player.radius + player.auraRadius)**2) {
+                            score++;
+                            scoreElement.innerText = score;
+                            p.isBacon = false;
+                            p.x = camera.x + (Math.random() - 0.5) * spreadX;
+                            p.z = camera.z + spreadZ - 200;
+                            p.vx = (Math.random() - 0.5) * 6; p.vz = (Math.random() - 0.5) * 6;
+                        }
+                    }
+                    while (p.z < camera.z - 150) { p.z += spreadZ; p.isBacon = false; }
+                    while (p.z > camera.z + spreadZ - 150) { p.z -= spreadZ; p.isBacon = false; }
+                    while (p.x < camera.x - spreadX/2) { p.x += spreadX; p.isBacon = false; }
+                    while (p.x > camera.x + spreadX/2) { p.x -= spreadX; p.isBacon = false; }
+                }
+
+                for (let w of wolves) {
+                    let nextWx = w.x + w.vx;
+                    let nextWz = w.z + w.vz;
+                    const distSq = (nextWx - player.x)**2 + (nextWz - player.z)**2;
+                    
+                    if (distSq < (25 + player.radius)**2) {
+                        if (player.hasSword) {
+                            player.hasSword = false;
+                            player.swordTimer = 0;
+                            swordUIElement.style.display = 'none';
+
+                            const numCoins = Math.floor(Math.random() * 5) + 1;
+                            for(let i = 0; i < numCoins; i++) {
+                                coinsMap.push({ x: w.x + (Math.random() - 0.5) * 80, z: w.z + (Math.random() - 0.5) * 80, animOffset: Math.random() * Math.PI * 2 });
+                            }
+                            w.x = camera.x + (Math.random() - 0.5) * spreadX; w.z = camera.z + spreadZ - 200;
+                        } 
+                        else if (player.shieldHits > 0) {
+                            player.shieldHits--;
+                            updateShieldUI();
+                            w.x = camera.x + (Math.random() - 0.5) * spreadX; w.z = camera.z + spreadZ - 200;
+                        } else {
+                            const loss = Math.max(5, Math.floor(score / 2));
+                            score -= loss;
+                            if (score < 0) {
+                                triggerGameOver('wolf');
+                            } else {
+                                scoreElement.innerText = score;
+                                w.x = camera.x + (Math.random() - 0.5) * spreadX; w.z = camera.z + spreadZ - 200;
+                            }
+                        }
+                    } else {
+                        w.x = nextWx; w.z = nextWz;
+                    }
+                    while (w.z < camera.z - 150) w.z += spreadZ;
+                    while (w.z > camera.z + spreadZ - 150) w.z -= spreadZ;
+                    while (w.x < camera.x - spreadX/2) w.x += spreadX;
+                    while (w.x > camera.x + spreadX/2) w.x -= spreadX;
+                }
+
+                for (let s of shields) {
+                    const distSq = (s.x - player.x)**2 + (s.z - player.z)**2;
+                    if (distSq < (20 + player.radius)**2) {
+                        player.shieldHits = s.hits; player.shieldUIChar = s.ui; updateShieldUI();
+                        const newType = getRandomShield(); s.hits = newType.hits; s.color = newType.color; s.ui = newType.ui;
+                        s.x = camera.x + (Math.random() - 0.5) * spreadX; s.z = camera.z + spreadZ - 200;
+                    }
+                    while (s.z < camera.z - 150) s.z += spreadZ; while (s.z > camera.z + spreadZ - 150) s.z -= spreadZ;
+                    while (s.x < camera.x - spreadX/2) s.x += spreadX; while (s.x > camera.x + spreadX/2) s.x -= spreadX;
+                }
+
+                for (let a of auras) {
+                    const distSq = (a.x - player.x)**2 + (a.z - player.z)**2;
+                    if (distSq < (20 + player.radius)**2) {
+                        player.auraRadius = 90; player.auraTimer = 30;
+                        a.x = camera.x + (Math.random() - 0.5) * spreadX; a.z = camera.z + spreadZ - 200;
+                    }
+                    while (a.z < camera.z - 150) a.z += spreadZ; while (a.z > camera.z + spreadZ - 150) a.z -= spreadZ;
+                    while (a.x < camera.x - spreadX/2) a.x += spreadX; while (a.x > camera.x + spreadX/2) a.x -= spreadX;
+                }
+
+                for (let sw of swords) {
+                    const distSq = (sw.x - player.x)**2 + (sw.z - player.z)**2;
+                    if (distSq < (20 + player.radius)**2) {
+                        player.hasSword = true; player.swordTimer = 30; swordUIElement.style.display = 'inline';
+                        sw.x = camera.x + (Math.random() - 0.5) * spreadX; sw.z = camera.z + spreadZ - 200;
+                    }
+                    while (sw.z < camera.z - 150) sw.z += spreadZ; while (sw.z > camera.z + spreadZ - 150) sw.z -= spreadZ;
+                    while (sw.x < camera.x - spreadX/2) sw.x += spreadX; while (sw.x > camera.x + spreadX/2) sw.x -= spreadX;
+                }
+
+                for (let i = coinsMap.length - 1; i >= 0; i--) {
+                    let c = coinsMap[i];
+                    if ((c.x - player.x)**2 + (c.z - player.z)**2 < (20 + player.radius + player.auraRadius)**2) {
+                        coinsScore++; coinElement.innerText = coinsScore; coinsMap.splice(i, 1);
+                    } else if (c.z < camera.z - 150 || Math.abs(c.x - camera.x) > spreadX/2) {
+                        coinsMap.splice(i, 1);
+                    }
+                }
+            } 
+            // --- LÓGICA DURANTE O MENU (START) ---
+            else if (gameState === 'START') {
+                player.facing = 'down'; // Jogador olha para a tela
+                player.isMoving = false;
+                camera.x = player.x;
+                camera.z = player.z - cameraDistance;
+                // Animais e mundo não se movem, ficam estáticos posando para a capa
+            }
+
+            // --- RENDERIZAÇÃO DO MUNDO (Comum a ambos os estados) ---
+            ctx.clearRect(0, 0, width, height);
+            const horizon = height * horizonRatio;
+
+            // Céu
+            const skyGrad = ctx.createLinearGradient(0, 0, 0, horizon);
+            skyGrad.addColorStop(0, '#5A9BD5'); 
+            skyGrad.addColorStop(1, '#B0E0E6'); 
+            ctx.fillStyle = skyGrad;
+            ctx.fillRect(0, 0, width, horizon);
+
+            // Chão
+            const groundGrad = ctx.createLinearGradient(0, horizon, 0, height);
+            groundGrad.addColorStop(0, '#556B2F'); 
+            groundGrad.addColorStop(1, '#228B22'); 
+            ctx.fillStyle = groundGrad;
+            ctx.fillRect(0, horizon, width, height);
+
+            // Z-Sorting
+            const visibleEntities = [];
+            for (let t of trees) { const dz = t.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'tree', obj: t, dz: dz }); }
+            for (let p of pigs) { const dz = p.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'pig', obj: p, dz: dz }); }
+            for (let w of wolves) { const dz = w.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'wolf', obj: w, dz: dz }); }
+            for (let s of shields) { const dz = s.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'shield', obj: s, dz: dz }); }
+            for (let a of auras) { const dz = a.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'aura', obj: a, dz: dz }); }
+            for (let sw of swords) { const dz = sw.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'sword', obj: sw, dz: dz }); }
+            for (let c of coinsMap) { const dz = c.z - camera.z; if (dz > 10) visibleEntities.push({ type: 'coin', obj: c, dz: dz }); }
+            
+            visibleEntities.push({ type: 'player', obj: player, dz: player.z - camera.z });
+            visibleEntities.sort((a, b) => b.dz - a.dz);
+
+            const cx = width / 2;
+
+            for (let item of visibleEntities) {
+                const entity = item.obj;
+                const dz = item.dz;
+                const scale = focalLength / dz;
+                const sx = cx + (entity.x - camera.x) * scale;
+                const sy = horizon + cameraHeight * scale;
+
+                let alpha = 1;
+                const fadeStart = spreadZ * 0.5;
+                if (dz > fadeStart) alpha = 1 - ((dz - fadeStart) / (spreadZ - fadeStart));
+                ctx.globalAlpha = Math.max(0, Math.min(1, alpha)); 
+
+                const approximateWidth = 300 * scale;
+                if (sx > -approximateWidth && sx < width + approximateWidth) {
+                    if (item.type === 'tree') drawTree(sx, sy, scale, entity);
+                    else if (item.type === 'pig') drawPig(sx, sy, scale, entity);
+                    else if (item.type === 'wolf') drawWolf(sx, sy, scale, entity);
+                    else if (item.type === 'shield') drawShield(sx, sy, scale, entity);
+                    else if (item.type === 'aura') drawAuraItem(sx, sy, scale, entity);
+                    else if (item.type === 'sword') drawSwordItem(sx, sy, scale, entity);
+                    else if (item.type === 'coin') drawCoinItem(sx, sy, scale, entity);
+                    else if (item.type === 'player') drawPlayer(sx, sy, scale, entity);
+                }
+            }
+            ctx.globalAlpha = 1;
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Inicia o motor
+        gameLoop();
+    </script>
+</body>
+</html>
