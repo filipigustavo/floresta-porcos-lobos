@@ -1,0 +1,13 @@
+{
+  "name": "floresta-porcos-lobos",
+  "install": "npm ci",
+  "terminals": [
+    {
+      "name": "dev-server",
+      "command": "npm run serve"
+    }
+  ],
+  "ports": [
+    8080
+  ]
+}
